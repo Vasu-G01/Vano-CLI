@@ -91,7 +91,3 @@ lecture-notion/
 - Add Status (Watched / To watch) and Date columns
 - Validate links before saving
 - Auto-summarize notes with an AI model
-
-## License
-
-MIT
