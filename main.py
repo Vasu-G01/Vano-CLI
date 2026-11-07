@@ -8,8 +8,30 @@ API_BASE = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"
 MAX_NOTES_LEN = 2000  # Notion's hard limit per rich-text object
 
-TOKEN = os.environ.get("NOTION_TOKEN", "")
-DB_ID = os.environ.get("NOTION_DATABASE_ID", "")
+
+def load_dotenv(path=".env"):
+    """Populate os.environ from a .env file without overwriting existing variables."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as env_file:
+        for line in env_file:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+
+
+load_dotenv()
+
+ALIASES = {  # legacy variable names kept for backward compatibility
+    "NOTION_TOKEN": ("NOTION_TOKEN", "NOTION_API_KEY"),
+    "NOTION_DATABASE_ID": ("NOTION_DATABASE_ID", "NOTION_DB_ID", "NOTION_DATA_SOURCE_ID"),
+}
+TOKEN = next((os.environ[n] for n in ALIASES["NOTION_TOKEN"] if os.environ.get(n)), "")
+DB_ID = next((os.environ[n] for n in ALIASES["NOTION_DATABASE_ID"] if os.environ.get(n)), "")
 
 
 def _headers():

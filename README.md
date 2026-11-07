@@ -26,7 +26,7 @@ A small command-line tool that saves lectures (for example, YouTube videos) stra
    | Notes  | Text  |
 
 3. Connect the integration to your database: open the database, click the `...` menu, choose **Connections**, and add your integration.
-4. Copy the data source ID: open **Manage data sources**, click the `...` next to your data source, and choose **Copy data source ID**.
+4. Copy the database ID from the database URL.
 
 ## Installation
 
@@ -38,12 +38,14 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Create a `.env` file in the project folder:
+Create a `.env` file in the project folder, next to `main.py`:
 
 ```
 NOTION_TOKEN=your_integration_token
-NOTION_DATA_SOURCE_ID=your_data_source_id
+NOTION_DATABASE_ID=your_database_id
 ```
+
+The script loads `.env` automatically. Existing configurations using `NOTION_DB_ID` are also supported. Process environment variables take precedence over values in `.env`.
 
 Never commit `.env` to GitHub. Make sure `.gitignore` contains:
 
@@ -54,7 +56,7 @@ Never commit `.env` to GitHub. Make sure `.gitignore` contains:
 ## Usage
 
 ```bash
-python lectures.py
+python main.py
 ```
 
 Example session:
