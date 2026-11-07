@@ -1,0 +1,6 @@
+# vano-cli-tool uses only the Python standard library (urllib, json, os) — nothing to install.
+# This file is kept so `pip install -r requirements.txt` succeeds as a no-op in a fresh checkout.
+# Python 3.10+ recommended (tested on 3.12).
+#
+# If you ever add a dependency, list pinned versions in the form:
+#   package==1.2.3
