@@ -1,135 +1,212 @@
 import json
 import os
-import sys
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-API_BASE = "https://api.notion.com/v1"
-NOTION_VERSION = "2022-06-28"
-MAX_NOTES_LEN = 2000  # Notion's hard limit per rich-text object
+BANNER_WIDTH = 62
+PROJECT_NAME = "VANO-TOOL"
+PROJECT_DESC = "Save your resources straight into Notion"
+PROJECT_GITHUB = "https://github.com/Vasu-G01/vano-cli-tool"
 
 
-def load_dotenv(path=".env"):
-    """Populate os.environ from a .env file without overwriting existing variables."""
-    if not os.path.exists(path):
-        return
-    with open(path, encoding="utf-8") as env_file:
-        for line in env_file:
+def load_env():
+    # Dev: .env next to main.py. Installed (pip/pipx): .env in the working directory.
+    seen = set()
+    for env_file in (Path(__file__).parent / ".env", Path.cwd() / ".env"):
+        if env_file in seen or not env_file.is_file():
+            continue
+        seen.add(env_file)
+        for line in env_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip().strip('"').strip("'")
-            os.environ.setdefault(key, value)
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip().strip('"'))
 
 
-load_dotenv()
+load_env()
 
-ALIASES = {  # legacy variable names kept for backward compatibility
-    "NOTION_TOKEN": ("NOTION_TOKEN", "NOTION_API_KEY"),
-    "NOTION_DATABASE_ID": ("NOTION_DATABASE_ID", "NOTION_DB_ID", "NOTION_DATA_SOURCE_ID"),
-}
-TOKEN = next((os.environ[n] for n in ALIASES["NOTION_TOKEN"] if os.environ.get(n)), "")
-DB_ID = next((os.environ[n] for n in ALIASES["NOTION_DATABASE_ID"] if os.environ.get(n)), "")
+TOKEN = os.environ.get("NOTION_TOKEN")
+DS_ID = (
+    os.environ.get("NOTION_DATA_SOURCE_ID")
+    or os.environ.get("NOTION_DATABASE_ID")
+    or os.environ.get("NOTION_DB_ID")
+)
 
-
-def _headers():
-    return {
-        "Authorization": f"Bearer {TOKEN}",
-        "Notion-Version": NOTION_VERSION,
-        "Content-Type": "application/json",
-    }
+if not TOKEN or not DS_ID:
+    raise SystemExit("Missing NOTION_TOKEN or NOTION_DATA_SOURCE_ID in .env")
 
 
-def api_call(method, endpoint, payload=None):
-    """Call the Notion API. Return (parsed_json, None) on success, (None, message) on failure."""
-    body = json.dumps(payload).encode("utf-8") if payload is not None else None
-    req = Request(f"{API_BASE}/{endpoint}", data=body, headers=_headers(), method=method)
+def safe_text(text):
+    """Make a string safe to print on a cp1252 Windows console."""
+    return str(text).encode("cp1252", errors="replace").decode("cp1252")
+
+
+def notion_request(path, body):
+    """POST to the Notion API and return parsed JSON, or None after printing the error."""
+    req = Request(
+        f"https://api.notion.com{path}",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {TOKEN}",
+            "Notion-Version": "2025-09-03",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
     try:
-        return json.loads(urlopen(req).read()), None
+        with urlopen(req) as response:
+            return json.load(response)
     except HTTPError as error:
         try:
             message = json.loads(error.read()).get("message", str(error))
         except (json.JSONDecodeError, AttributeError):
             message = str(error)
-        # 401/404 get action-specific text; they are easy to misread otherwise.
-        if error.code == 401:
-            message = "Notion rejected the token (401). Check that NOTION_TOKEN is a valid integration secret."
-        elif error.code == 404 and endpoint.startswith("databases/"):
-            message = ("Database not found or not shared with this integration (404). "
-                       "In Notion, open the database, click '...' menu, select Connections, and add this integration.")
-        return None, message
+        print("Error:", safe_text(message))
     except URLError as error:
-        return None, str(error.reason)
+        print("Error:", error.reason)
+    return None
+
+
+def show_banner():
+    print("=" * BANNER_WIDTH)
+    print(PROJECT_NAME.center(BANNER_WIDTH))
+    print(safe_text(PROJECT_DESC).center(BANNER_WIDTH))
+    print(safe_text(PROJECT_GITHUB).center(BANNER_WIDTH))
+    print("=" * BANNER_WIDTH)
 
 
 def check_connection():
-    """Fail fast with a clear message if credentials or access are broken."""
-    if not TOKEN:
-        print("Error: NOTION_TOKEN is not set. "
-              "Create an integration at https://www.notion.so/profile/integrations and set NOTION_TOKEN to its secret.")
-        return False
-    if not DB_ID:
-        print("Error: NOTION_DATABASE_ID is not set. "
-              "Copy the database ID from its URL in Notion (the 32-char hex string) and set NOTION_DATABASE_ID.")
-        return False
-
-    db, error = api_call("GET", f"databases/{DB_ID}")
-    if error:
-        print("Error:", error)
-        return False
-    title = "".join(t.get("plain_text", "") for t in db.get("title", []))
-    print(f"Connected to Notion. Database: {title or DB_ID}")
-    return True
+    """Verify credentials and access before showing the menu (page_size=1 query)."""
+    data = notion_request(
+        f"/v1/data_sources/{DS_ID}/query",
+        {"page_size": 1},
+    )
+    if data is None:
+        raise SystemExit(
+            "Could not reach the Notion database. Check NOTION_TOKEN, "
+            "NOTION_DATA_SOURCE_ID, and that the database is shared with your integration."
+        )
 
 
-def build_page(title, link, notes):
-    props = {"Title": {"title": [{"text": {"content": title}}]}}
-    if link:
-        props["Link"] = {"url": link}
-    if notes:
-        props["Notes"] = {"rich_text": [{"text": {"content": notes[:MAX_NOTES_LEN]}}]}
-    return {"parent": {"database_id": DB_ID}, "properties": props}
+def save_resource(title, link, notes):
+    props = {
+        "Title": {"title": [{"text": {"content": title}}]},
+        "Link": {"url": link or None},
+        "Notes": {"rich_text": [{"text": {"content": notes[:2000]}}]},
+    }
+    body = {
+        "parent": {"type": "data_source_id", "data_source_id": DS_ID},
+        "properties": props,
+    }
+    result = notion_request("/v1/pages", body)
+    if result is not None:
+        print("Saved to Notion!")
 
 
-def save_lecture(title, link, notes):
-    result, error = api_call("POST", "pages", build_page(title, link, notes))
-    if error:
-        print("Error:", error)
-        return False
-    print("Saved to Notion!", f"(page id: {result.get('id')})")
-    return True
-
-
-def prompt_lecture():
-    for attempt in range(3):
-        try:
-            title = input("Title: ").strip()
-        except EOFError:
-            return None
-        if title:
-            break
-        print("Title is required.")
-    else:
-        return None
-    link = ""
-    notes = ""
-    try:
-        link = input("Link: ").strip()
-        notes = input("Notes/caption (optional): ").strip()
-    except EOFError:
-        pass
+def page_values(page):
+    """Pull (title, link, notes) out of a queried Notion page."""
+    props = page.get("properties", {})
+    title_parts = props.get("Title", {}).get("title") or []
+    title = "".join(part.get("plain_text", "") for part in title_parts)
+    link = props.get("Link", {}).get("url") or ""
+    notes_parts = props.get("Notes", {}).get("rich_text") or []
+    notes = "".join(part.get("plain_text", "") for part in notes_parts)
     return title, link, notes
 
 
+def fetch_all_resources():
+    """Query every saved page from the database, newest first. Returns None on error."""
+    rows = []
+    start_cursor = None
+    while True:
+        body = {
+            "page_size": 100,
+            "sorts": [{"timestamp": "created_time", "direction": "descending"}],
+        }
+        if start_cursor:
+            body["start_cursor"] = start_cursor
+        data = notion_request(f"/v1/data_sources/{DS_ID}/query", body)
+        if data is None:
+            return None
+        rows.extend(page_values(page) for page in data.get("results", []))
+        if data.get("has_more") and data.get("next_cursor"):
+            start_cursor = data["next_cursor"]
+        else:
+            return rows
+
+
+def print_table(rows):
+    """Print rows of (title, link, notes) as an ASCII table with dynamic widths."""
+    headers = ["#", "Title", "Link", "Notes"]
+    caps = {0: 4, 1: 40, 2: 45, 3: 45}
+    numbered = [
+        [str(i), title, link, notes]
+        for i, (title, link, notes) in enumerate(rows, start=1)
+    ]
+    widths = [len(h) for h in headers]
+    for col in range(len(headers)):
+        for row in numbered:
+            widths[col] = min(caps[col], max(widths[col], len(safe_text(row[col]))))
+
+    def clip(value, width):
+        value = safe_text(value)
+        return value if len(value) <= width else value[: width - 3] + "..."
+
+    separator = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+    print(separator)
+    print("| " + " | ".join(h.ljust(w) for h, w in zip(headers, widths)) + " |")
+    print(separator)
+    for row in numbered:
+        print("| " + " | ".join(clip(v, w).ljust(w) for v, w in zip(row, widths)) + " |")
+    print(separator)
+    print(f"{len(numbered)} resource(s) saved.")
+
+
+def show_resources():
+    rows = fetch_all_resources()
+    if rows is None:
+        return
+    if not rows:
+        print("No Resources saved yet.")
+        return
+    print()
+    print_table(rows)
+
+
+def add_resource():
+    title = input("Title: ").strip()
+    link = input("Link: ").strip()
+    notes = input("Notes/caption (optional): ").strip()
+    if not title:
+        print("Title is required.")
+        return
+    save_resource(title, link, notes)
+
+
+def show_menu():
+    print()
+    print("What do you want to do?")
+    print("  1. Show saved Resources (from Notion)")
+    print("  2. Add a new Resource")
+    print("  3. Exit")
+
+
 def main():
-    if not check_connection():
-        sys.exit(1)
-    lecture = prompt_lecture()
-    if lecture is None:
-        sys.exit(1)
-    sys.exit(0 if save_lecture(*lecture) else 1)
+    show_banner()
+    check_connection()
+    while True:
+        show_menu()
+        choice = input("Choose an option (1-3): ").strip()
+        if choice == "1":
+            show_resources()
+        elif choice == "2":
+            add_resource()
+        elif choice == "3":
+            print("Goodbye!")
+            break
+        else:
+            print("Please enter 1, 2, or 3.")
 
 
 if __name__ == "__main__":
