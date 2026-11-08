@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vano-tool"
-version = "0.1.0"
+version = "0.1.1"
 description = "Save your resources straight into Notion - a tiny menu-driven CLI"
 readme = "README.md"
 requires-python = ">=3.8"

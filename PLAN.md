@@ -4,6 +4,8 @@ Development plan for vano-cli-tool — a single-file CLI that saves resources to
 
 ## Current state (as of Nov 2026)
 
+- `pyproject.toml` version is `0.1.1` (not yet uploaded to PyPI — the live release is still 0.1.0).
+
 - `main.py` works end-to-end: interactive menu flow — on startup it prints a
   centered banner (project name `VANO-TOOL`, one-line description, GitHub link
   `https://github.com/Vasu-G01`), runs a connection check, then loops on:
@@ -11,6 +13,11 @@ Development plan for vano-cli-tool — a single-file CLI that saves resources to
      and renders it as an ASCII table with dynamic column widths (cp1252-safe).
   2. *Add a new resource* — the original Title / Link / Notes prompts.
   3. *Exit*.
+- Guided first-run setup: with no credentials configured, `prompt_credentials()`
+  asks for `NOTION_TOKEN` and `NOTION_DATA_SOURCE_ID` (accepts a bare id, a
+  dashed uuid, or a pasted database URL and extracts the 32-char id), then
+  offers to write them to `.env` in the current folder before the connection
+  check and menu run. Verified end-to-end with a simulated fresh user.
 - Credentials come from `.env` (user-scope env vars still win): `NOTION_TOKEN`
   and `NOTION_DATA_SOURCE_ID` (`NOTION_DATABASE_ID` / `NOTION_DB_ID` accepted
   as fallbacks).

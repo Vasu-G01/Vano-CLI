@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -34,7 +35,8 @@ DS_ID = (
 )
 
 if not TOKEN or not DS_ID:
-    raise SystemExit("Missing NOTION_TOKEN or NOTION_DATA_SOURCE_ID in .env")
+    # Credentials are still missing - main() runs the interactive first-run setup.
+    pass
 
 
 def safe_text(text):
@@ -87,6 +89,69 @@ def check_connection():
             "Could not reach the Notion database. Check NOTION_TOKEN, "
             "NOTION_DATA_SOURCE_ID, and that the database is shared with your integration."
         )
+
+
+UUID_RE = re.compile(r"[0-9a-fA-F]{32}")
+
+
+def extract_id(value):
+    """Accept a bare id, a dashed uuid, or a pasted Notion URL and return the id."""
+    value = value.strip().replace("-", "")
+    match = UUID_RE.search(value)
+    return match.group(0) if match else None
+
+
+def prompt_credentials():
+    """Interactive first-run setup: collect credentials when none are configured."""
+    global TOKEN, DS_ID
+    print()
+    print("No Notion credentials found yet. One-time setup:")
+    print("  1. NOTION_TOKEN - the integration secret from notion.so/my-integrations")
+    print("  2. NOTION_DATA_SOURCE_ID - the id of the database shared with that")
+    print("     integration (paste the bare id, uuid, or the database URL)")
+    print()
+    while not TOKEN:
+        value = input("NOTION_TOKEN: ").strip()
+        if not value:
+            print("This value is required.")
+            continue
+        if not (value.startswith("secret_") or value.startswith("ntn_")):
+            print("Note: Notion integration secrets usually start with 'secret_' or 'ntn_'.")
+        TOKEN = value
+        print(f"Token accepted: ...{TOKEN[-4:]}")
+    while not DS_ID:
+        value = input("NOTION_DATA_SOURCE_ID: ").strip()
+        extracted = extract_id(value)
+        if not extracted:
+            print("That does not look like a Notion id or URL. Paste the database")
+            print("URL or the 32-character id from it.")
+            continue
+        DS_ID = extracted
+        print(f"Database id accepted: {DS_ID}")
+    maybe_save_env()
+
+
+def maybe_save_env():
+    """Offer to write the just-entered credentials to .env in the current folder."""
+    choice = input("Save these to .env in this folder for next time? (Y/n): ").strip().lower()
+    if choice not in ("", "y", "yes"):
+        os.environ["NOTION_TOKEN"] = TOKEN
+        os.environ["NOTION_DATA_SOURCE_ID"] = DS_ID
+        print("Credentials kept in memory for this run only.")
+        return
+    env_path = Path.cwd() / ".env"
+    os.environ["NOTION_TOKEN"] = TOKEN
+    os.environ["NOTION_DATA_SOURCE_ID"] = DS_ID
+    lines = []
+    if env_path.is_file():  # keep unrelated keys that may already be there
+        keys = ("NOTION_TOKEN", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_DB_ID")
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if line.strip() and not any(line.strip().startswith(k + "=") for k in keys):
+                lines.append(line)
+    lines.append(f"NOTION_TOKEN={TOKEN}")
+    lines.append(f"NOTION_DATA_SOURCE_ID={DS_ID}")
+    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Saved to {env_path}. It is already covered by .gitignore in this repo.")
 
 
 def save_resource(title, link, notes):
@@ -194,6 +259,8 @@ def show_menu():
 
 def main():
     show_banner()
+    if not TOKEN or not DS_ID:
+        prompt_credentials()
     check_connection()
     while True:
         show_menu()

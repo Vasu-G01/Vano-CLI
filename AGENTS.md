@@ -18,6 +18,7 @@ Guidance for AI coding agents working in this repository.
 ## Running
 
 - Run directly: `python main.py`. Reads `.env` (process env vars win) at startup; stdlib only, so there is nothing to install — `requirements.txt` is intentionally empty.
+- With no credentials configured, the CLI runs a one-time interactive setup (`prompt_credentials()`): asks for `NOTION_TOKEN` and `NOTION_DATA_SOURCE_ID`, can accept a pasted database **URL** (see `extract_id()`), and offers to save to `.env` in the current working directory. Warn (not fail) on values that look off (`secret_`/`ntn_` prefix, 32-hex id).
 - Script is interactive: it prints a banner, runs `check_connection()` (a `page_size=1` query on the data source) and exits before the menu if credentials or access are broken, then loops on a 3-option menu (1: show saved resources as a table, 2: add a resource, 3: exit). Run it in a terminal, not non-interactively.
 - README.md and requirements.txt are no longer placeholders — keep them in sync when behavior changes.
 

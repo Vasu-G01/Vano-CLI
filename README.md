@@ -5,6 +5,7 @@ A small command-line tool that saves resources (videos, articles, docs - anythin
 ## Features
 
 - Header banner with the project name, description, and GitHub link on startup
+- Guided first-run setup: if no credentials exist, `vano` asks for them and offers to save them to `.env`
 - Simple menu: **view saved resources** in a clean table, or **add a new one**
 - Interactive prompts for title, link, and notes when inserting
 - Shows every resource, newest first, in an ASCII table (works on any Windows console)
@@ -29,7 +30,7 @@ A small command-line tool that saves resources (videos, articles, docs - anythin
    | Notes  | Text  |
 
 3. Connect the integration to your database: open the database, click the `...` menu, choose **Connections**, and add your integration.
-4. Copy the database ID from the database URL.
+4. Run `vano` — it will ask for your secret and database (id or URL) and finish the setup for you. Advanced users can skip the prompts and instead write a `.env` themselves (see *First run* under Installation). Copy the database ID from the database URL if you go that route.
 
 ## Installation
 
@@ -43,7 +44,37 @@ vano
 That installs the `vano` command on your PATH. No other Python dependencies
 (the tool uses only the standard library).
 
-### First run: give it your Notion credentials
+### First run: give it your Notion credentials (guided)
+
+Just run the tool once — it walks you through everything:
+
+```text
+vano
+==============================================================
+                        VANO-TOOL
+...
+NOTION_TOKEN: ntn_xxxxxxxxxxxx...
+Token accepted: ...xxxx
+NOTION_DATA_SOURCE_ID: https://www.notion.so/my-workspace-1f2e3d4c...
+Database id accepted: 1f2e3d4c...
+Save these to .env in this folder for next time? (Y/n): Y
+Saved to C:\Users\you\tools\.env
+Connecting...
+What do you want to do?
+  1. Show saved resources (from Notion)
+  2. Add a new resource
+  3. Exit
+```
+
+Steps, one by one:
+
+1. Run `vano`. If no credentials are found, it starts the one-time setup.
+2. Paste your **integration secret** as `NOTION_TOKEN` (usually starts with `secret_` or `ntn_`).
+3. Paste your **database URL or id** — the tool extracts the 32-character id for you, even from a full Notion URL.
+4. Confirm `Y` to save them to `.env` in the current folder (answer `n` to keep them for this run only).
+5. The tool verifies the connection and then shows the menu. From now on, `vano` starts straight at the menu.
+
+### Prefer configuring manually?
 
 Either set them once as user environment variables:
 
