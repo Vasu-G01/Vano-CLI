@@ -38,7 +38,8 @@ Development plan for vano-cli-tool — a single-file CLI that saves resources to
 - [x] `--list` command: show recent entries from the database — shipped as menu option *1. Show saved resources* (in-menu table rather than a CLI flag; a `--list` flag can be added on top if scripted use is needed).
 - [x] On startup, show the project name centered, a short description, and the GitHub link (`Vasu-G01`).
 - [ ] Tag/status support if you add properties like `Subject` or `Date` to the database — then update the `props` dict, the table columns in `print_table()`/`page_values()`, and `AGENTS.md` schema section together.
-- [x] Package with `pyproject.toml`: PyPI distribution name `vano-tool` (verified available), console entry point `vano` (`vano = "main:main"`), setuptools backend, `main.py` kept as the single module via `py-modules`. Not uploaded yet — follow the "Publishing to PyPI" section in README.md.
+- [x] Package with `pyproject.toml`: PyPI distribution name `vano-tool`, console entry point `vano` (`vano = "main:main"`), setuptools backend, `main.py` kept as the single module via `py-modules`.
+- [x] Published: https://pypi.org/project/vano-tool/ (v0.1.0, wheel + sdist; verified by installing from PyPI into a clean venv and running the `vano` command end-to-end).
 
 ## Standing conventions for any change
 

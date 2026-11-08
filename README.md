@@ -33,21 +33,53 @@ A small command-line tool that saves resources (videos, articles, docs - anythin
 
 ## Installation
 
-```bash
-git clone https://github.com/Vasu-G01/vano-cli-tool.git
-cd vano-cli-tool
-```
-
-No install step needed: the tool uses only the Python standard library
-(`requirements.txt` is intentionally empty).
-
-Once published, you can also install it straight from PyPI (this also gives you
-the `vano` command on your PATH):
+The tool is published on PyPI. The easiest way for anyone to use it:
 
 ```bash
 pipx install vano-tool   # or: pip install vano-tool
 vano
 ```
+
+That installs the `vano` command on your PATH. No other Python dependencies
+(the tool uses only the standard library).
+
+### First run: give it your Notion credentials
+
+Either set them once as user environment variables:
+
+```bash
+# Windows (run in a NEW terminal afterwards)
+setx NOTION_TOKEN "your_integration_token"
+setx NOTION_DATA_SOURCE_ID "your_data_source_id"
+```
+
+```bash
+# macOS / Linux (add to ~/.bashrc or ~/.zshrc)
+export NOTION_TOKEN="your_integration_token"
+export NOTION_DATA_SOURCE_ID="your_data_source_id"
+```
+
+...or keep them in a `.env` file in whatever folder you run `vano` from:
+
+```
+NOTION_TOKEN=your_integration_token
+NOTION_DATA_SOURCE_ID=your_data_source_id
+```
+
+Process environment variables take precedence over `.env` values.
+Older setups using `NOTION_DATABASE_ID` or `NOTION_DB_ID` are also accepted
+as fallbacks for the second variable.
+
+### Prefer running from source?
+
+```bash
+git clone https://github.com/Vasu-G01/vano-cli-tool.git
+cd vano-cli-tool
+python main.py
+```
+
+No install step needed: the tool uses only the Python standard library
+(`requirements.txt` is intentionally empty).
 
 ## Publishing to PyPI (maintainers)
 
@@ -64,16 +96,15 @@ Bump the `version` in `pyproject.toml` before every re-upload.
 
 ## Configuration
 
-Create a `.env` file in the project folder, next to `main.py`:
+Secrets are supplied either as environment variables or through a `.env` file —
+see "First run" under Installation for all options.
+
+For **development in this repo**, keep a `.env` file next to `main.py`:
 
 ```
 NOTION_TOKEN=your_integration_token
 NOTION_DATA_SOURCE_ID=your_data_source_id
 ```
-
-Older setups using `NOTION_DATABASE_ID` or `NOTION_DB_ID` are also accepted as a
-fallback for the second variable. Process environment variables take precedence
-over values in `.env`.
 
 Never commit `.env` to GitHub. Make sure `.gitignore` contains:
 
@@ -82,6 +113,14 @@ Never commit `.env` to GitHub. Make sure `.gitignore` contains:
 ```
 
 ## Usage
+
+Run the installed command:
+
+```bash
+vano
+```
+
+Or from a source checkout:
 
 ```bash
 python main.py
