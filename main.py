@@ -78,13 +78,61 @@ def show_banner():
     print("=" * BANNER_WIDTH)
 
 
+def notion_get(path):
+    """GET from the Notion API and return parsed JSON, or None after printing the error."""
+    req = Request(
+        f"https://api.notion.com{path}",
+        headers={
+            "Authorization": f"Bearer {TOKEN}",
+            "Notion-Version": "2025-09-03",
+        },
+        method="GET",
+    )
+    try:
+        with urlopen(req) as response:
+            return json.load(response)
+    except HTTPError as error:
+        try:
+            message = json.loads(error.read()).get("message", str(error))
+        except (json.JSONDecodeError, AttributeError):
+            message = str(error)
+        print("Error:", safe_text(message))
+    except URLError as error:
+        print("Error:", error.reason)
+    return None
+
+
+def resolve_database_id():
+    """Older configs may hold the Notion *database* id, but this API version targets
+    *data source* ids. If DS_ID turns out to be a database, swap in its data source."""
+    global DS_ID
+    data = notion_get(f"/v1/databases/{DS_ID}")
+    if not data:
+        return False
+    sources = data.get("data_sources") or []
+    if not sources or not sources[0].get("id"):
+        return False
+    old_id = DS_ID
+    DS_ID = sources[0]["id"]
+    os.environ["NOTION_DATA_SOURCE_ID"] = DS_ID
+    print()
+    print("Fixed automatically: that id is a Notion database id.")
+    print(f"  was:    {old_id}")
+    print(f"  is now: {DS_ID}")
+    print("Update NOTION_DATA_SOURCE_ID wherever you set it (env var or .env) to keep this.")
+    return True
+
+
+def query_data_source(payload):
+    return notion_request(f"/v1/data_sources/{DS_ID}/query", payload)
+
+
 def check_connection():
     """Verify credentials and access before showing the menu (page_size=1 query)."""
-    data = notion_request(
-        f"/v1/data_sources/{DS_ID}/query",
-        {"page_size": 1},
-    )
-    if data is None:
+    ok = query_data_source({"page_size": 1}) is not None
+    if not ok and resolve_database_id():
+        ok = query_data_source({"page_size": 1}) is not None
+    if not ok:
         raise SystemExit(
             "Could not reach the Notion database. Check NOTION_TOKEN, "
             "NOTION_DATA_SOURCE_ID, and that the database is shared with your integration."
@@ -101,6 +149,15 @@ def extract_id(value):
     return match.group(0) if match else None
 
 
+def ask(prompt):
+    """input() that exits with a clear message instead of a traceback on EOF."""
+    try:
+        return input(prompt).strip()
+    except EOFError:
+        print()
+        raise SystemExit("Setup interrupted - run vano again to finish.")
+
+
 def prompt_credentials():
     """Interactive first-run setup: collect credentials when none are configured."""
     global TOKEN, DS_ID
@@ -111,7 +168,7 @@ def prompt_credentials():
     print("     integration (paste the bare id, uuid, or the database URL)")
     print()
     while not TOKEN:
-        value = input("NOTION_TOKEN: ").strip()
+        value = ask("NOTION_TOKEN: ")
         if not value:
             print("This value is required.")
             continue
@@ -120,7 +177,7 @@ def prompt_credentials():
         TOKEN = value
         print(f"Token accepted: ...{TOKEN[-4:]}")
     while not DS_ID:
-        value = input("NOTION_DATA_SOURCE_ID: ").strip()
+        value = ask("NOTION_DATA_SOURCE_ID: ")
         extracted = extract_id(value)
         if not extracted:
             print("That does not look like a Notion id or URL. Paste the database")
@@ -133,7 +190,7 @@ def prompt_credentials():
 
 def maybe_save_env():
     """Offer to write the just-entered credentials to .env in the current folder."""
-    choice = input("Save these to .env in this folder for next time? (Y/n): ").strip().lower()
+    choice = ask("Save these to .env in this folder for next time? (Y/n): ").lower()
     if choice not in ("", "y", "yes"):
         os.environ["NOTION_TOKEN"] = TOKEN
         os.environ["NOTION_DATA_SOURCE_ID"] = DS_ID
@@ -240,9 +297,9 @@ def show_resources():
 
 
 def add_resource():
-    title = input("Title: ").strip()
-    link = input("Link: ").strip()
-    notes = input("Notes/caption (optional): ").strip()
+    title = ask("Title: ")
+    link = ask("Link: ")
+    notes = ask("Notes/caption (optional): ")
     if not title:
         print("Title is required.")
         return
@@ -264,7 +321,7 @@ def main():
     check_connection()
     while True:
         show_menu()
-        choice = input("Choose an option (1-3): ").strip()
+        choice = ask("Choose an option (1-3): ")
         if choice == "1":
             show_resources()
         elif choice == "2":

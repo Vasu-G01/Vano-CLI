@@ -209,6 +209,10 @@ vano-cli-tool/
 
 ## Troubleshooting
 
+- **Could not find data_source with ID ...** : the configured id is a **database** id while this Notion API version talks to **data source** ids. From vano 0.1.2 the tool auto-resolves this (and tells you the corrected id to put back in your config). Check for a stale `NOTION_DATABASE_ID` in your user/system environment variables and remove or update it:
+  ```powershell
+  [Environment]::SetEnvironmentVariable("NOTION_DATABASE_ID", $null, "User")
+  ```
 - **"object not found" error:** the integration is not connected to the database. Add it under Connections.
 - **"property does not exist" error:** column names in Notion must match the script exactly (`Title`, `Link`, `Notes`).
 - **Invalid URL error:** the link must start with `http://` or `https://`.

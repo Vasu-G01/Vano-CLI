@@ -13,11 +13,17 @@ Development plan for vano-cli-tool — a single-file CLI that saves resources to
      and renders it as an ASCII table with dynamic column widths (cp1252-safe).
   2. *Add a new resource* — the original Title / Link / Notes prompts.
   3. *Exit*.
-- Guided first-run setup: with no credentials configured, `prompt_credentials()`
+- Socket-level guard added later: with no credentials configured, `prompt_credentials()`
   asks for `NOTION_TOKEN` and `NOTION_DATA_SOURCE_ID` (accepts a bare id, a
   dashed uuid, or a pasted database URL and extracts the 32-char id), then
   offers to write them to `.env` in the current folder before the connection
   check and menu run. Verified end-to-end with a simulated fresh user.
+- v0.1.2: with an older config that holds the Notion *database* id,
+  `resolve_database_id()` auto-swaps it for its data source id
+  (`GET /v1/databases/{id}` returns the list) and re-checks the connection.
+  Verified live with an actual stale database id. Also: all interactive
+  prompts go through `ask()`, which reports "Setup interrupted" cleanly on
+  piped-input EOF instead of a traceback.
 - Credentials come from `.env` (user-scope env vars still win): `NOTION_TOKEN`
   and `NOTION_DATA_SOURCE_ID` (`NOTION_DATABASE_ID` / `NOTION_DB_ID` accepted
   as fallbacks).
